@@ -1,0 +1,52 @@
+:root { font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; color: #2c302e; background: #eae8e2; font-synthesis: none; }
+* { box-sizing: border-box; }
+body { margin: 0; overflow: hidden; }
+button { font: inherit; cursor: pointer; }
+.workspace { width: 100vw; height: 100dvh; }
+.model-panel { position: relative; width: 100%; height: 100%; overflow: hidden; background: #eae8e2; }
+.viewport { position: absolute; inset: 0; }
+.viewport canvas { display: block; width: 100%; height: 100%; }
+.view-toolbar { position: absolute; z-index: 2; top: 20px; left: 22px; padding: 4px; display: flex; gap: 2px; border: 1px solid rgba(68, 61, 52, .08); border-radius: 12px; background: rgba(255, 255, 255, .9); box-shadow: 0 8px 26px rgba(43, 38, 30, .08); backdrop-filter: blur(12px); }
+.view-button { min-height: 35px; padding: 0 13px; border: 0; border-radius: 8px; background: transparent; color: #666960; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.view-button:hover { background: #f1eee7; }
+.view-button.active { background: #35453f; color: #fff; }
+.furniture-panel { position: absolute; z-index: 2; top: 76px; left: 22px; width: 205px; padding: 11px; border: 1px solid rgba(68, 61, 52, .1); border-radius: 12px; background: rgba(255, 255, 255, .93); box-shadow: 0 8px 26px rgba(43, 38, 30, .08); backdrop-filter: blur(12px); }
+.furniture-heading { display: flex; align-items: center; justify-content: space-between; gap: 4px; color: #35453f; font-size: 12px; }
+.furniture-heading button, #remove-sofa { border: 0; border-radius: 7px; background: #e8eee8; color: #35453f; padding: 5px 7px; font-size: 10px; }
+.furniture-heading button[aria-pressed="true"] { background: #35453f; color: #fff; }
+.furniture-card { display: flex; width: 100%; align-items: center; gap: 8px; margin-top: 10px; padding: 7px; border: 1px solid #d8d5cd; border-radius: 9px; background: #fffefa; color: #35453f; text-align: left; touch-action: none; user-select: none; cursor: grab; }
+.furniture-card:active { cursor: grabbing; }
+.furniture-card strong { display: block; font-size: 11px; line-height: 1.3; }
+.furniture-card small { display: block; margin-top: 3px; color: #84887e; font-size: 10px; white-space: nowrap; }
+.sofa-icon { position: relative; flex: 0 0 52px; height: 42px; border-radius: 9px; background: #e8e0d2; box-shadow: inset 0 0 0 2px #d4c9b8; }
+.sofa-icon::before { position: absolute; content: ''; left: 5px; right: 5px; top: 6px; height: 12px; border-radius: 5px; background: #f8f3e8; }
+.sofa-icon span { position: absolute; bottom: 5px; width: 19px; height: 17px; border-radius: 5px; background: #f6f0e3; box-shadow: 0 1px 2px #a99f8e; }
+.sofa-icon span:first-child { left: 6px; } .sofa-icon span:last-child { right: 6px; }
+.furniture-panel[data-sofa-color="camel"] .sofa-icon { background: #947563; box-shadow: inset 0 0 0 2px #785d4e; }
+.furniture-panel[data-sofa-color="camel"] .sofa-icon::before, .furniture-panel[data-sofa-color="camel"] .sofa-icon span { background: #ae8e7b; }
+.sofa-colors { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 9px; }
+.sofa-colors button { display: flex; align-items: center; justify-content: center; gap: 5px; min-height: 30px; padding: 0 4px; border: 1px solid #d8d5cd; border-radius: 7px; background: #fffefa; color: #526158; font-size: 10px; white-space: nowrap; }
+.sofa-colors button[aria-pressed="true"] { border-color: #35453f; box-shadow: inset 0 0 0 1px #35453f; }
+.sofa-colors i { width: 13px; height: 13px; border: 1px solid #b9ad9b; border-radius: 50%; background: #eee7da; }
+.sofa-colors [data-sofa-color="camel"] i { background: #ae8e7b; }
+.furniture-panel p { margin: 8px 1px; color: #858980; font-size: 10px; line-height: 1.4; }
+#remove-sofa { width: 100%; }
+.furniture-panel button:disabled { opacity: .48; cursor: default; }
+.furniture-panel.inactive .furniture-card { opacity: .55; }
+.mini-map { position: absolute; z-index: 2; top: 20px; right: 22px; width: 260px; padding: 11px 11px 7px; border: 1px solid rgba(68, 61, 52, .1); border-radius: 12px; background: rgba(255, 255, 255, .93); box-shadow: 0 8px 26px rgba(43, 38, 30, .08); backdrop-filter: blur(12px); }
+.mini-map-title { display: flex; justify-content: space-between; align-items: center; padding: 0 3px 4px; font-size: 12px; font-weight: 700; color: #35453f; }
+.mini-map-title span { font-size: 11px; font-weight: 500; color: #858980; }
+.mini-map canvas { display: block; width: 100%; height: auto; }
+.mini-map-tip { padding: 3px 3px 1px; color: #858980; font-size: 10px; text-align: center; }
+.sun-control { display: flex; align-items: center; gap: 8px; margin: 8px 3px 2px; padding-top: 8px; border-top: 1px solid #e4e5df; color: #526158; font-size: 11px; white-space: nowrap; }
+.sun-control input { flex: 1; min-width: 0; accent-color: #c48242; cursor: pointer; }
+.sun-control output { width: 30px; text-align: right; font-variant-numeric: tabular-nums; }
+.walk-hint { position: absolute; z-index: 2; left: 50%; bottom: 23px; transform: translateX(-50%); padding: 9px 14px; border-radius: 8px; background: rgba(39, 54, 48, .87); color: white; font-size: 12px; white-space: nowrap; pointer-events: none; }
+.walk-hint[hidden] { display: none; }
+.export-actions { position: absolute; z-index: 2; left: 22px; bottom: 20px; display: flex; gap: 8px; }
+.export-actions button { min-height: 38px; border: 1px solid #c8c7bf; border-radius: 9px; background: #fffefa; padding: 0 13px; font-size: 12px; font-weight: 600; color: #35453f; box-shadow: 0 5px 15px rgba(43, 38, 30, .07); }
+.export-actions button:hover { border-color: #8b9a91; background: #f8faf6; }
+#toast { position: fixed; z-index: 10; left: 50%; bottom: 26px; transform: translate(-50%, 10px); padding: 9px 15px; border-radius: 8px; background: #35453f; color: white; box-shadow: 0 8px 24px #0002; opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; font-size: 12px; }
+#toast.visible { opacity: 1; transform: translate(-50%, 0); }
+@media (max-width: 700px) { .view-toolbar { top: 12px; left: 12px; right: 12px; } .view-button { flex: 1; padding: 0 5px; font-size: 11px; } .furniture-panel { top: 60px; left: 12px; width: 150px; padding: 7px; } .furniture-heading { font-size: 10px; } .furniture-card { gap: 5px; padding: 5px; } .furniture-card strong { font-size: 9px; } .furniture-card small { font-size: 8px; } .sofa-icon { flex-basis: 38px; height: 34px; } .sofa-icon span { width: 13px; height: 14px; } .sofa-colors { gap: 4px; } .sofa-colors button { gap: 3px; padding: 0 2px; font-size: 9px; } .sofa-colors i { width: 10px; height: 10px; } .furniture-panel p { font-size: 9px; } .mini-map { top: 60px; right: 12px; width: 174px; padding: 7px 7px 4px; } .mini-map-title { font-size: 10px; } .mini-map-title span { font-size: 9px; } .sun-control { gap: 4px; font-size: 9px; } .sun-control output { width: 25px; } .walk-hint { bottom: 59px; max-width: calc(100% - 24px); font-size: 10px; text-align: center; white-space: normal; } .export-actions { left: 12px; bottom: 14px; } .export-actions button { padding: 0 9px; font-size: 10px; } }
+@media (max-width: 360px) { .furniture-panel { left: 8px; width: 130px; } .mini-map { right: 8px; width: 150px; } .furniture-card { display: block; } .sofa-icon { display: block; width: 100%; margin-bottom: 4px; } }

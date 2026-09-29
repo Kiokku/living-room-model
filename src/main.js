@@ -1,0 +1,277 @@
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
+import { createRoomModel, ROOM } from './roomModel.js';
+import { createBedroomModel, createBalconyModel, BEDROOM } from './bedroomModel.js';
+import { createMiniMap } from './miniMap.js';
+import { createWalkMode } from './walkMode.js';
+import { createObjectInteractions } from './objectInteractions.js';
+import { createFurnitureEditor } from './furnitureEditor.js';
+import './style.css';
+
+document.querySelector('#app').innerHTML = `
+  <main class="workspace">
+    <section class="model-panel" aria-label="三维户型模型">
+      <div class="view-toolbar" role="group" aria-label="切换观察视角">
+        <button class="view-button active" data-view="axonometric" type="button">轴测视角</button>
+        <button class="view-button" data-view="top" type="button">俯视视角</button>
+        <button class="view-button" data-view="bedroom" type="button">主卧视角</button>
+        <button class="view-button" data-view="walk" type="button">漫游模式</button>
+      </div>
+      <div id="viewport" class="viewport"></div>
+      <aside class="furniture-panel" aria-label="软装编辑">
+        <div class="furniture-heading"><strong>软装家具</strong><button id="edit-mode" type="button" aria-pressed="true">编辑中</button></div>
+        <button id="sofa-card" class="furniture-card" type="button">
+          <span class="sofa-icon" aria-hidden="true"><span></span><span></span></span>
+          <span><strong>NORHOR HUG 沙发</strong><small>210 × 95 × 82 cm</small></span>
+        </button>
+        <div class="sofa-colors" role="group" aria-label="沙发颜色">
+          <button type="button" data-sofa-color="cream" aria-pressed="true"><i aria-hidden="true"></i>奶油色</button>
+          <button type="button" data-sofa-color="camel" aria-pressed="false"><i aria-hidden="true"></i>浅驼色</button>
+        </div>
+        <p>拖入客厅空地，拖动已放置的沙发调整位置</p>
+        <button id="remove-sofa" type="button" disabled>移除选中沙发</button>
+      </aside>
+      <aside class="mini-map" aria-label="二维户型地图">
+        <div class="mini-map-title">二维户型 <span id="map-mode">轴测视角</span></div>
+        <canvas id="mini-map-canvas" width="520" height="420" role="img" aria-label="客厅、主卧及阳台平面图；标记显示漫游位置或固定视角焦点"></canvas>
+        <div class="mini-map-tip">点击窗帘、门、柜门可开合</div>
+        <label class="sun-control" for="sun-brightness"><span>东南晨光</span><input id="sun-brightness" type="range" min="0" max="100" value="100"><output id="sun-value" for="sun-brightness">100%</output></label>
+      </aside>
+      <div id="walk-hint" class="walk-hint" hidden>WASD 行走 · 鼠标转向 · 点击物件开合</div>
+      <div class="export-actions"><button id="save-png" type="button">下载当前视角 PNG</button><button id="save-glb" type="button">导出三维模型 GLB</button></div>
+    </section>
+  </main>
+  <div id="toast" role="status" aria-live="polite"></div>
+`;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xeceae4);
+const model = createRoomModel();
+const bedroom = createBedroomModel();
+const balcony = createBalconyModel();
+const sofas = [];
+const combinedRoot = new THREE.Group();
+combinedRoot.name = '客厅主卧封闭阳台户型';
+combinedRoot.add(model.root, bedroom.root, balcony.root);
+scene.add(combinedRoot);
+
+const camera = new THREE.PerspectiveCamera(40, 1, 0.04, 100);
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.12;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.querySelector('#viewport').append(renderer.domElement);
+
+const ambient = new THREE.HemisphereLight(0xffffff, 0xd7c7ae, 1.55);
+scene.add(ambient);
+const sun = new THREE.DirectionalLight(0xfff0d8, 2.2);
+sun.position.set(-7.2, 11.8, -7);
+sun.target.position.set(-1.7, 0, 0);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.left = -7;
+sun.shadow.camera.right = 7;
+sun.shadow.camera.top = 7;
+sun.shadow.camera.bottom = -7;
+sun.shadow.camera.near = 0.5;
+sun.shadow.camera.far = 24;
+sun.shadow.bias = -0.0003;
+sun.shadow.normalBias = 0.02;
+scene.add(sun, sun.target);
+
+const emissiveMaterials = new Map();
+combinedRoot.traverse((node) => {
+  if (node.isMesh && node.material.emissiveIntensity && !node.name.includes('顶灯') && !node.name.includes('吸顶灯')) {
+    emissiveMaterials.set(node.material, node.material.emissiveIntensity);
+  }
+});
+const sunSlider = document.querySelector('#sun-brightness');
+function setSunBrightness(value) {
+  const daylight = Number(value) / 100;
+  sun.intensity = 2.2 * daylight;
+  ambient.intensity = 0.07 + 1.48 * daylight;
+  emissiveMaterials.forEach((initial, material) => { material.emissiveIntensity = initial * (0.08 + 0.92 * daylight); });
+  scene.background.set(0x101a29).lerp(new THREE.Color(0xeceae4), daylight);
+  document.querySelector('#sun-value').value = `${value}%`;
+}
+sunSlider.addEventListener('input', () => setSunBrightness(sunSlider.value));
+setSunBrightness(sunSlider.value);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.07;
+controls.minDistance = 0.5;
+controls.maxDistance = 24;
+controls.maxPolarAngle = Math.PI * 0.52;
+const walkRoots = [model.root, bedroom.root, balcony.root];
+const walk = createWalkMode(camera, renderer.domElement, walkRoots, {
+  left: BEDROOM.left, right: ROOM.width / 2, far: -ROOM.length / 2, near: ROOM.length / 2,
+});
+const miniMap = createMiniMap(document.querySelector('#mini-map-canvas'), sofas);
+const walkHint = document.querySelector('#walk-hint');
+const interactions = createObjectInteractions(camera, renderer.domElement, combinedRoot, walk, showToast);
+const editor = createFurnitureEditor({
+  canvas: renderer.domElement, camera, controls, root: combinedRoot, walkRoots, sofas, room: ROOM,
+  panel: document.querySelector('.furniture-panel'), card: document.querySelector('#sofa-card'),
+  toggle: document.querySelector('#edit-mode'), remove: document.querySelector('#remove-sofa'), announce: showToast,
+});
+const doorPart = (node, open) => ({ node, axis: 'rotationY', closed: 0, open });
+interactions.add('客厅窗帘', false, model.curtains.map((node) => ({ node, axis: 'scaleX', closed: 1, open: 0.18 })));
+interactions.add('主卧窗帘', true, bedroom.curtains.map((node) => ({ node, axis: 'scaleX', closed: 1, open: 0.32 })));
+interactions.add('客厅入口门', true, [doorPart(model.doors.entryDoor, Math.PI * 0.46)]);
+interactions.add('客厅侧门', false, [doorPart(model.doors.sideDoor, -1.3)]);
+interactions.add('主卧入口门', true, [doorPart(bedroom.doors.entryDoor, 0.55)]);
+interactions.add('主卧阳台门', false, [doorPart(bedroom.doors.balconyDoor, -1.3)]);
+model.cabinetDoors.forEach((node, index) => interactions.add(`客厅柜门 ${index + 1}`, false, [doorPart(node, index ? -1.1 : 1.1)]));
+bedroom.wardrobeDoors.forEach(({ node, openAngle }, index) => interactions.add(`主卧衣柜门 ${index + 1}`, true, [doorPart(node, openAngle)]));
+
+let currentView = 'axonometric';
+function setView(view) {
+  if (walk.active && view !== 'walk') walk.exit();
+  currentView = view;
+  const bedroomIndoor = view === 'bedroom';
+  const walking = view === 'walk';
+  const viewport = document.querySelector('#viewport');
+  const mobile = viewport.clientWidth <= 700;
+  const aspect = viewport.clientWidth / viewport.clientHeight;
+  camera.fov = view === 'top' ? (mobile ? 12 : 10) : walking ? (mobile ? 78 : 72) : bedroomIndoor ? (mobile ? 70 : 58) : (aspect < 0.7 ? 56 : 40);
+  camera.updateProjectionMatrix();
+  controls.maxDistance = view === 'top' ? 90 : 28;
+  model.fullWalls.visible = walking;
+  model.cutWalls.visible = !walking;
+  model.ceiling.visible = walking;
+  bedroom.fullWalls.visible = bedroomIndoor || walking;
+  bedroom.cutWalls.visible = !(bedroomIndoor || walking);
+  bedroom.ceiling.visible = bedroomIndoor || walking;
+  balcony.ceiling.visible = walking;
+  balcony.dimensions.visible = !(bedroomIndoor || walking);
+  model.dimensions.visible = !(bedroomIndoor || walking);
+  bedroom.dimensions.visible = !(bedroomIndoor || walking);
+  controls.enabled = !walking;
+  editor.setView(view);
+  walkHint.hidden = !walking;
+  document.querySelector('#map-mode').textContent = { axonometric: '轴测视角', top: '俯视视角', bedroom: '主卧视角', walk: '漫游模式' }[view];
+  camera.up.set(0, view === 'top' ? 0 : 1, view === 'top' ? -1 : 0);
+  if (walking) {
+    if (!walk.active) walk.enter();
+  } else if (view === 'top') {
+    const topDistance = Math.max(44, 9 / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * aspect));
+    camera.position.set(-1.77, topDistance, 0.001);
+    controls.target.set(-1.77, 0, 0.4);
+  } else if (view === 'bedroom') {
+    camera.position.set(-2.85, 1.58, 2.13);
+    controls.target.set(-3.59, 1.18, -1.25);
+  } else {
+    const framing = THREE.MathUtils.clamp((aspect - 0.8) / 0.6, 0, 1);
+    camera.position.set(-1.72, THREE.MathUtils.lerp(10.5, 6.8, framing), THREE.MathUtils.lerp(14.5, 9, framing));
+    controls.target.set(-1.72, 0.58, 0.4);
+  }
+  if (!walking) {
+    camera.lookAt(controls.target);
+    controls.update();
+  }
+  document.querySelectorAll('.view-button').forEach((button) => {
+    const active = button.dataset.view === view;
+    button.classList.toggle('active', active);
+    button.setAttribute('aria-pressed', active);
+  });
+}
+
+const viewport = document.querySelector('#viewport');
+let lastMobile = viewport.clientWidth <= 700;
+let lastAspect = viewport.clientWidth / viewport.clientHeight;
+new ResizeObserver(() => {
+  const { width, height } = viewport.getBoundingClientRect();
+  if (!width || !height) return;
+  const mobile = width <= 700;
+  const aspect = width / height;
+  const reframe = mobile !== lastMobile || Math.abs(aspect - lastAspect) > 0.1;
+  lastMobile = mobile;
+  lastAspect = aspect;
+  if (reframe) setView(currentView);
+  camera.aspect = width / height;
+  camera.updateProjectionMatrix();
+  renderer.setSize(width, height, false);
+}).observe(viewport);
+
+const clock = new THREE.Clock();
+function animate() {
+  requestAnimationFrame(animate);
+  const delta = clock.getDelta();
+  interactions.update(delta);
+  walk.update(delta);
+  if (!walk.active) controls.update();
+  const mapPosition = currentView === 'walk' ? walk.position : currentView === 'bedroom' ? camera.position : controls.target;
+  const mapYaw = currentView === 'walk' ? walk.yaw : Math.atan2(camera.position.x - controls.target.x, camera.position.z - controls.target.z);
+  miniMap.draw(mapPosition, mapYaw, currentView);
+  renderer.render(scene, camera);
+}
+setView('axonometric');
+animate();
+
+document.querySelectorAll('.view-button').forEach((button) => button.addEventListener('click', () => {
+  setView(button.dataset.view);
+}));
+document.addEventListener('pointerlockchange', () => {
+  walkHint.textContent = document.pointerLockElement === renderer.domElement
+    ? 'WASD 行走 · 鼠标转向 · 点击物件开合 · Esc 释放鼠标'
+    : 'WASD 行走 · 拖动鼠标转向 · 点击物件开合';
+});
+
+const toast = document.querySelector('#toast');
+let toastTimer;
+function showToast(message) {
+  toast.textContent = message;
+  toast.classList.add('visible');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toast.classList.remove('visible'), 3000);
+}
+
+function download(url, filename) {
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.append(link);
+  link.click();
+  link.remove();
+}
+
+document.querySelector('#save-png').addEventListener('click', () => {
+  renderer.render(scene, camera);
+  download(renderer.domElement.toDataURL('image/png'), `客厅主卧阳台户型-${currentView}.png`);
+  showToast('当前视角 PNG 已生成');
+});
+
+document.querySelector('#save-glb').addEventListener('click', () => {
+  const previous = [model.fullWalls.visible, model.cutWalls.visible, model.ceiling.visible, model.dimensions.visible, bedroom.fullWalls.visible, bedroom.cutWalls.visible, bedroom.ceiling.visible, bedroom.dimensions.visible, balcony.ceiling.visible, balcony.dimensions.visible];
+  model.fullWalls.visible = true;
+  model.cutWalls.visible = false;
+  model.ceiling.visible = true;
+  model.dimensions.visible = false;
+  bedroom.fullWalls.visible = true;
+  bedroom.cutWalls.visible = false;
+  bedroom.ceiling.visible = true;
+  bedroom.dimensions.visible = false;
+  balcony.ceiling.visible = true;
+  balcony.dimensions.visible = false;
+  const restore = () => {
+    [model.fullWalls.visible, model.cutWalls.visible, model.ceiling.visible, model.dimensions.visible, bedroom.fullWalls.visible, bedroom.cutWalls.visible, bedroom.ceiling.visible, bedroom.dimensions.visible, balcony.ceiling.visible, balcony.dimensions.visible] = previous;
+  };
+  new GLTFExporter().parse(combinedRoot, (result) => {
+    restore();
+    const url = URL.createObjectURL(new Blob([result], { type: 'model/gltf-binary' }));
+    download(url, '客厅主卧阳台户型.glb');
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    showToast('GLB 模型已生成');
+  }, (error) => {
+    restore();
+    console.error(error);
+    showToast('导出失败，请查看浏览器控制台');
+  }, { binary: true, onlyVisible: true });
+});
+
+window.__ROOM_MODEL__ = { ROOM, BEDROOM, setView, scene, camera, renderer, model, bedroom, balcony, sofas, combinedRoot, walk };
