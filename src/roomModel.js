@@ -127,9 +127,8 @@ function makeDoors(parent) {
   box(parent, [e.right - e.left + 0.09, 0.045, 0.105], [(e.left + e.right) / 2, e.height + 0.04, 2.68], trim);
   const entryDoor = new THREE.Group();
   entryDoor.position.set(e.left, 0, 2.65);
-  entryDoor.rotation.y = Math.PI * 0.46;
   const leafWidth = e.right - e.left - 0.02;
-  box(entryDoor, [leafWidth, 2.07, 0.035], [leafWidth / 2, 1.035, 0], doorWhite, '入口门扇（开启示意）');
+  box(entryDoor, [leafWidth, 2.07, 0.035], [leafWidth / 2, 1.035, 0], doorWhite, '入口门扇');
   box(entryDoor, [0.13, 0.025, 0.035], [leafWidth - 0.14, 1.02, -0.04], black, '入口门把手');
   parent.add(entryDoor);
 

@@ -14,6 +14,7 @@ export const BEDROOM = {
   entry: { left: -3.13, right: -2.43, height: 2.08 },
   farDoor: { left: -2.93, right: -2.23, height: 2.08 },
   window: { left: -4.73, right: -3.29, sill: 0.88, top: 2.06 },
+  wardrobe: { left: -5.19, right: -3.31, depth: 0.55, partitions: [-4.68, -3.84] },
 };
 
 const floorPhoto = new THREE.TextureLoader().load(`${import.meta.env.BASE_URL}textures/floor-from-video.jpg`);
@@ -81,24 +82,21 @@ function windowAndDoors(parent) {
   for (const x of [entry.left, entry.right]) box(parent, [0.04, entry.height + 0.05, 0.1], [x, (entry.height + 0.05) / 2, near], trim, '主卧入门门框');
   const leaf = new THREE.Group();
   leaf.position.set(entry.left, 0, near - 0.06);
-  leaf.rotation.y = 0.55;
-  box(leaf, [entry.right - entry.left - 0.02, entry.height - 0.025, 0.035], [(entry.right - entry.left) / 2, entry.height / 2, 0], doorWhite, '主卧入门门扇（开启示意）');
+  box(leaf, [entry.right - entry.left - 0.02, entry.height - 0.025, 0.035], [(entry.right - entry.left) / 2, entry.height / 2, 0], doorWhite, '主卧入门门扇');
   box(leaf, [0.13, 0.022, 0.04], [entry.right - entry.left - 0.14, 1.01, -0.035], black, '主卧门把手');
   parent.add(leaf);
   return { entryDoor: leaf, balconyDoor };
 }
 
 function wardrobe(parent) {
-  const left = -5.19;
-  const right = -3.31;
+  const { left, right, depth, partitions } = BEDROOM.wardrobe;
   const near = BEDROOM.near - 0.035;
-  const depth = 0.55;
   const front = near - depth;
   const mid = (near + front) / 2;
   const height = 2.37;
   box(parent, [right - left, height, 0.02], [(left + right) / 2, height / 2, near], wardrobeWhite, '主卧固定衣柜背板');
   box(parent, [right - left, height, 0.008], [(left + right) / 2, height / 2, near - 0.018], wood, '衣柜木色内衬');
-  for (const x of [left, -4.68, -3.84, right]) box(parent, [0.025, height, depth], [x, height / 2, mid], wardrobeWhite, '衣柜隔板');
+  for (const x of [left, ...partitions, right]) box(parent, [0.025, height, depth], [x, height / 2, mid], wardrobeWhite, '衣柜隔板');
   for (const y of [0.04, 1.99, height]) box(parent, [right - left, 0.025, depth], [(left + right) / 2, y, mid], wardrobeWhite, '衣柜层板');
   for (const y of [0.52, 0.85, 1.18, 1.5]) box(parent, [0.49, 0.018, depth - 0.03], [-4.94, y, mid], wood, '衣柜开放格');
   for (const y of [0.17, 0.38]) box(parent, [0.73, 0.19, 0.025], [-4.26, y, front - 0.015], wardrobeWhite, '衣柜抽屉');
@@ -108,8 +106,7 @@ function wardrobe(parent) {
   for (const [x, width, angle] of [[-4.92, 0.48, -0.55], [-4.47, 0.43, 0.5], [-3.62, 0.52, -0.65]]) {
     const door = new THREE.Group();
     door.position.set(x - width / 2, 0, front);
-    door.rotation.y = angle;
-    box(door, [width, 1.92, 0.02], [width / 2, 1.02, 0], wardrobeWhite, '开启的衣柜门');
+    box(door, [width, 1.92, 0.02], [width / 2, 1.02, 0], wardrobeWhite, '衣柜门');
     parent.add(door);
     doors.push({ node: door, openAngle: angle });
   }
@@ -121,8 +118,6 @@ function details(parent) {
   box(parent, [0.025, 0.73, length - 0.07], [left + 0.065, 0.365, (far + near) / 2], wood, '主卧木色半墙');
   box(parent, [0.045, 0.026, length - 0.07], [left + 0.08, 0.74, (far + near) / 2], woodDark, '半墙收口');
   box(parent, [0.024, 0.09, length], [right - 0.012, 0.045, (far + near) / 2], woodDark, '主卧踢脚线');
-  box(parent, [0.68, 0.25, 0.2], [left + 0.2, 2.19, far + 0.42], trim, '窗边壁挂空调（尺寸估算）');
-  box(parent, [0.015, 0.05, 0.48], [left + 0.31, 2.07, far + 0.42], new THREE.MeshStandardMaterial({ color: 0xb7b4ac }), '空调出风口');
   const curtains = [];
   const curtainLeft = window.left - 0.1;
   const curtainRight = window.right + 0.1;
