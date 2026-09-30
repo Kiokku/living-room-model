@@ -5,6 +5,7 @@ import { createRoomModel, ROOM } from './roomModel.js';
 import { createBedroomModel, createBalconyModel, BEDROOM } from './bedroomModel.js';
 import { createMiniMap } from './miniMap.js';
 import { createFloorPlan } from './floorPlan.js';
+import { createViewTransition } from './viewTransition.js';
 import { createWalkMode } from './walkMode.js';
 import { createObjectInteractions } from './objectInteractions.js';
 import { createFurnitureEditor } from './furnitureEditor.js';
@@ -155,7 +156,17 @@ bedroom.wardrobeDoors.forEach(({ node, openAngle }, index) => interactions.add(`
 
 let currentView = 'axonometric';
 let currentMode = 'plan';
+const viewTransition = createViewTransition({
+  camera, controls, viewport: document.querySelector('#viewport'), plan: document.querySelector('#floor-plan'),
+  panel: document.querySelector('.model-panel'), floorPlan,
+  onFinish: () => {
+    document.querySelector('.workspace').dataset.mode = currentMode;
+    document.querySelector('.view-toolbar').hidden = currentMode === 'plan';
+    editor.setView(currentMode === 'plan' ? 'plan' : currentView);
+  },
+});
 function setView(view) {
+  viewTransition.cancel();
   if (walk.active && view !== 'walk') walk.exit();
   currentView = view;
   const bedroomIndoor = view === 'bedroom';
@@ -207,13 +218,19 @@ function setView(view) {
 }
 
 function setMode(mode) {
-  if (mode === 'plan' && currentView === 'walk') setView('axonometric');
+  if (mode === currentMode && (mode === 'scene' || viewTransition.active)) return;
+  const reveal = currentMode === 'plan' && mode === 'scene'
+    && !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const reverse = currentMode === 'scene' && mode === 'plan'
+    && !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  viewTransition.cancel();
+  if (mode === 'plan' && ['walk', 'bedroom'].includes(currentView)) setView('axonometric');
   currentMode = mode;
   const plan = mode === 'plan';
-  document.querySelector('.workspace').dataset.mode = mode;
-  document.querySelector('#floor-plan').hidden = !plan;
-  document.querySelector('#viewport').hidden = plan;
-  document.querySelector('.view-toolbar').hidden = plan;
+  document.querySelector('.workspace').dataset.mode = reverse ? 'scene' : mode;
+  document.querySelector('#floor-plan').hidden = !plan && !reveal;
+  document.querySelector('#viewport').hidden = plan && !reverse;
+  document.querySelector('.view-toolbar').hidden = plan && !reverse;
   document.querySelector('#save-png').textContent = plan ? '下载二维图 PNG' : '下载当前视角 PNG';
   editor.setView(plan ? 'plan' : currentView);
   if (plan) floorPlan.draw();
@@ -222,7 +239,22 @@ function setMode(mode) {
     button.classList.toggle('active', active);
     button.setAttribute('aria-pressed', active);
   });
-  if (!plan) requestAnimationFrame(() => setView(currentView));
+  if (!plan) {
+    const viewport = document.querySelector('#viewport');
+    const { width, height } = viewport.getBoundingClientRect();
+    camera.aspect = width / height;
+    renderer.setSize(width, height, false);
+    setView('axonometric');
+    if (reveal) {
+      floorPlan.draw();
+      viewTransition.start(performance.now());
+      editor.setView('transition');
+    }
+  }
+  if (reverse) {
+    viewTransition.start(performance.now(), true);
+    editor.setView('transition');
+  }
 }
 
 const viewport = document.querySelector('#viewport');
@@ -233,10 +265,11 @@ new ResizeObserver(() => {
   if (!width || !height) return;
   const mobile = width <= 700;
   const aspect = width / height;
+  if (viewTransition.active && Math.abs(aspect - camera.aspect) > 0.001) viewTransition.cancel();
   const reframe = mobile !== lastMobile || Math.abs(aspect - lastAspect) > 0.1;
   lastMobile = mobile;
   lastAspect = aspect;
-  if (reframe) setView(currentView);
+  if (reframe && !viewTransition.active) setView(currentView);
   camera.aspect = width / height;
   camera.updateProjectionMatrix();
   renderer.setSize(width, height, false);
@@ -248,11 +281,13 @@ function animate() {
   const delta = clock.getDelta();
   interactions.update(delta);
   walk.update(delta);
-  if (!walk.active) controls.update();
+  viewTransition.update(performance.now());
+  if (!walk.active && !viewTransition.active) controls.update();
   const mapPosition = currentView === 'walk' ? walk.position : currentView === 'bedroom' ? camera.position : controls.target;
   const mapYaw = currentView === 'walk' ? walk.yaw : Math.atan2(camera.position.x - controls.target.x, camera.position.z - controls.target.z);
   miniMap.draw(mapPosition, mapYaw, currentView);
-  if (currentMode === 'plan') floorPlan.draw();
+  if (viewTransition.active) renderer.render(scene, camera);
+  else if (currentMode === 'plan') floorPlan.draw();
   else renderer.render(scene, camera);
 }
 setView('axonometric');
